@@ -6,6 +6,8 @@ import re
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 
+complicatedRegex = re.compile(r"([a-z0-9!#$%&'*+\/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+\/=?^_`{|}~-]+)*(@|\sat\s)(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(\.|\sdot\s))+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)")
+
 new_urls = deque()
 
 def add_to_queue():
@@ -20,7 +22,7 @@ def request_page(url):
         pass
 
 def check_email(html):
-    emails = re.findall(r"([a-z0-9!#$%&'*+\/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+\/=?^_`{|}~-]+)*(@|\sat\s)(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(\.|\sdot\s))+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)", str(html))
+    emails = re.findall(complicatedRegex, str(html))
     mails = []
     for mail in emails:
         a,b,c = mail
@@ -30,8 +32,8 @@ def check_email(html):
     return mails
 
 def grab_links(html,url):
+    list_of_links = []
     try:
-        list_of_links = []
         soup = BeautifulSoup(html, 'lxml')
         parts = urlsplit(url)
         base_url = "{0.scheme}://{0.netloc}".format(parts)
@@ -47,8 +49,6 @@ def grab_links(html,url):
                 pass
             else:
                 list_of_links.append(anchor)
-        # print(list_of_links)
-        return list_of_links
     except:
         pass
     return list_of_links
