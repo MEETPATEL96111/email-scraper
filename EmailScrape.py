@@ -1,52 +1,23 @@
 import requests
-import re
+from bs4 import BeautifulSoup
 from urllib.parse import urlparse
 from urllib.parse import urlsplit
-from bs4 import BeautifulSoup
+import re
+from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 
-site_list = [line.rstrip('\n') for line in open(r'sites.txt')]
+new_urls = deque()
 
-#site_list = ['http://www.fx-today.com']
+def add_to_queue():
+    for line in open('emailFinder.txt'):
+        new_urls.append(line.strip())
 
-domain_list = []
-
-def parse_sites():
-    site = site_list.pop()
-    parse = urlparse(site)
-    return '{}://{}'.format(parse.scheme,parse.netloc)
-
-def generate_regex(domain):
-    domain = domain.replace('.','\.')
-    domain = domain.replace("\\",'\\')
-    regex = re.compile('{}{}'.format(domain,'.*'))
-    return regex
-
-def grab_page(page):
+def request_page(url):
     try:
-        r = requests.get(page)
+        r = requests.get(url)
         return r.text
     except:
-        return ''
-
-def grab_links(html,url,regex):
-    list_of_links = []
-    soup = BeautifulSoup(html,'lxml')
-    parts = urlsplit(url)
-    base_url = "{0.scheme}://{0.netloc}".format(parts)
-    path = url[:url.rfind('/') + 1] if '/' in parts.path else url
-    for anchor in soup.find_all("a"):
-        anchor = anchor['href']
-        if anchor.startswith('/'):
-            scheme = urlparse(url).scheme
-            netloc = urlparse(url).netloc
-            anchor = '{}://{}{}'.format(scheme,netloc,anchor)
-            list_of_links.append(anchor)
-        if urlparse(anchor).netloc != urlparse(url).netloc:
-            pass
-        else:
-            list_of_links.append(anchor)
-    #print(list_of_links)
-    return list_of_links
+        pass
 
 def check_email(html):
     emails = re.findall(r"([a-z0-9!#$%&'*+\/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+\/=?^_`{|}~-]+)*(@|\sat\s)(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(\.|\sdot\s))+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)", str(html))
@@ -58,44 +29,57 @@ def check_email(html):
     #print(mails)
     return mails
 
+def grab_links(html,url):
+    try:
+        list_of_links = []
+        soup = BeautifulSoup(html, 'lxml')
+        parts = urlsplit(url)
+        base_url = "{0.scheme}://{0.netloc}".format(parts)
+        path = url[:url.rfind('/') + 1] if '/' in parts.path else url
+        for anchor in soup.find_all("a"):
+            anchor = anchor['href']
+            if anchor.startswith('/'):
+                scheme = urlparse(url).scheme
+                netloc = urlparse(url).netloc
+                anchor = '{}://{}{}'.format(scheme, netloc, anchor)
+                list_of_links.append(anchor)
+            if urlparse(anchor).netloc != urlparse(url).netloc:
+                pass
+            else:
+                list_of_links.append(anchor)
+        # print(list_of_links)
+        return list_of_links
+    except:
+        pass
+    return list_of_links
+
 def write_to_csv(url,email_list):
     string = ','.join(email_list)
     final_string = '{},{}\n'.format(url,string)
-    with open('Results.csv','a',encoding='utf-8') as file:
-        file.write(final_string)
-
-
-def site_parser():
-    for site in site_list:
-        domain = parse_sites()
-        domain_list.append(domain)
-
-def email_grabber():
-    for domain in domain_list:
-        re1 = '{}{}'.format(domain,'.*')
-        regex = re.compile(re1)
-        html = grab_page(domain)
-        list_of_links = grab_links(html,domain,regex)
-        list_of_emails = check_email(html)
-        #print(list_of_emails)
-        empty_email_list = []
-        for email in list_of_emails:
-            if email not in empty_email_list:
-                empty_email_list.append(email)
-        for link in list_of_links:
-            html = grab_page(link)
-            emails_found = check_email(html)
-            for mail in emails_found:
-                if mail not in empty_email_list:
-                    empty_email_list.append(mail)
-        write_to_csv(domain,empty_email_list)
+    if len(email_list) > 0:
+        with open('Results.csv','a',encoding='utf-8') as file:
+            file.write(final_string)
 
 def main():
-    site_parser()
-    email_grabber()
+    add_to_queue()
+    while len(new_urls) > 0:
+        url = new_urls.pop()
+        list_of_urls = []
+        mail = []
+        done_urls = []
+        html = request_page(url)
+        list_of_links = grab_links(html,url)
+        emails = check_email(html)
+        for link in list_of_links:
+            list_of_urls.append(link)
+        for email in emails:
+            mail.append(email)
+        write_to_csv(url,mail)
+        for link in list_of_urls:
+            if link not in done_urls:
+                html = request_page(link)
+                mails = check_email(html)
+                write_to_csv(link,mails)
+                done_urls.append(link)
 
 main()
-
-
-
-
