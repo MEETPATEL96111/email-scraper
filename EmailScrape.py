@@ -6,7 +6,7 @@ import re
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 
-complicatedRegex = re.compile(r"([a-z0-9!#$%&'*+\/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+\/=?^_`{|}~-]+)*(@|\sat\s)(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(\.|\sdot\s))+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)")
+complicatedRegex = re.compile(r"([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)?)") // best ever regex for email scraping
 
 new_urls = deque()
 
